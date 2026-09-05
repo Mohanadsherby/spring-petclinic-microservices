@@ -1,0 +1,131 @@
+name: petclinic-learning
+
+services:
+  config-server:
+    image: petclinic/config-server:0.1.0
+    ports:
+      - "8888:8888"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8888/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  discovery-server:
+    image: petclinic/discovery-server:0.1.0
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888/
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      config-server:
+        condition: service_healthy
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8761/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  customers-service:
+    image: petclinic/customers-service:0.1.0
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888/
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8081/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  vets-service:
+    image: petclinic/vets-service:0.1.0
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888/
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8083/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  visits-service:
+    image: petclinic/visits-service:0.1.0
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888/
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8082/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  api-gateway:
+    image: petclinic/api-gateway:0.1.0
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888/
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      customers-service:
+        condition: service_healthy
+      vets-service:
+        condition: service_healthy
+      visits-service:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:8080/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  admin-server:
+    image: petclinic/admin-server:0.1.0
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888/
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--output", "/dev/null", "http://localhost:9090/actuator/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s

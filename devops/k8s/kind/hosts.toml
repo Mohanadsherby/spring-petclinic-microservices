@@ -1,0 +1,4 @@
+server = "http://nexus:8081"
+
+[host."http://nexus:8081"]
+  capabilities = ["pull", "resolve"]

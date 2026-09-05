@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: visits-service
+  labels:
+    app: visits-service
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: visits-service
+  template:
+    metadata:
+      labels:
+        app: visits-service
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+      containers:
+        - name: visits-service
+          image: {{ .Values.imageRegistry }}/{{ .Values.visitsService.image }}:{{ .Values.visitsService.tag }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: petclinic-config
+          ports:
+            - containerPort: {{ .Values.visitsService.port }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.visitsService.healthPath }}
+              port: {{ .Values.visitsService.port }}
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.visitsService.healthPath }}
+              port: {{ .Values.visitsService.port }}
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.visitsService.healthPath }}
+              port: {{ .Values.visitsService.port }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: visits-service
+  labels:
+    app: visits-service
+spec:
+  type: ClusterIP
+  selector:
+    app: visits-service
+  ports:
+    - port: {{ .Values.visitsService.port }}
+      targetPort: {{ .Values.visitsService.port }}

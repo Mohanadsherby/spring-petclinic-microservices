@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+  labels:
+    app: config-server
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
+      containers:
+        - name: config-server
+          image: {{ .Values.imageRegistry }}/{{ .Values.configServer.image }}:{{ .Values.configServer.tag }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.configServer.port }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.configServer.healthPath }}
+              port: {{ .Values.configServer.port }}
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.configServer.healthPath }}
+              port: {{ .Values.configServer.port }}
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.configServer.healthPath }}
+              port: {{ .Values.configServer.port }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server
+  labels:
+    app: config-server
+spec:
+  type: ClusterIP
+  selector:
+    app: config-server
+  ports:
+    - port: {{ .Values.configServer.port }}
+      targetPort: {{ .Values.configServer.port }}
