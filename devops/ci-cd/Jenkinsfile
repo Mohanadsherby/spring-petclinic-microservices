@@ -22,7 +22,7 @@ pipeline {
             }
         }
 
-        // Build an image per service and push it to Nexus.
+        // Build an image per service, scan it, then push it to Nexus.
         stage('Build & push images') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
@@ -31,6 +31,11 @@ pipeline {
 
                         for svc in $SERVICES; do
                             docker build --provenance=false -f devops/docker/$svc/Dockerfile -t localhost:8084/docker-hosted/dev/$svc:$TAG spring-petclinic-$svc
+
+                            # Security scan (Phase 4). Runs Trivy as a throwaway container.
+                            # --exit-code 0 => report only, never fail the build (yet).
+                            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 localhost:8084/docker-hosted/dev/$svc:$TAG
+
                             docker push localhost:8084/docker-hosted/dev/$svc:$TAG
                         done
                     '''
