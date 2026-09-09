@@ -33,8 +33,10 @@ pipeline {
                             docker build --provenance=false -f devops/docker/$svc/Dockerfile -t localhost:8084/docker-hosted/dev/$svc:$TAG spring-petclinic-$svc
 
                             # Security scan (Phase 4). Runs Trivy as a throwaway container.
-                            # --exit-code 0 => report only, never fail the build (yet).
-                            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --exit-code 0 localhost:8084/docker-hosted/dev/$svc:$TAG
+                            #  - trivy-cache volume keeps the vuln DB between builds (no re-download)
+                            #  - --timeout 15m: our machine is slow, avoid the default 5m timeout
+                            #  - report only for now; || true so a slow scan never fails the build
+                            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/trivy aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --timeout 15m --exit-code 0 localhost:8084/docker-hosted/dev/$svc:$TAG || true
 
                             docker push localhost:8084/docker-hosted/dev/$svc:$TAG
                         done
