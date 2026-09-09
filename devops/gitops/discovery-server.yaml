@@ -1,0 +1,22 @@
+# ArgoCD Application: watches git and deploys the discovery-server release.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: discovery-server
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Mohanadsherby/spring-petclinic-microservices.git
+    targetRevision: main
+    path: devops/helm/petclinic
+    helm:
+      valueFiles:
+        - values/discovery-server.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

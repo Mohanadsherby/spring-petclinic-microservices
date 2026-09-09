@@ -45,15 +45,8 @@ pipeline {
             }
         }
 
-        // Deploy each service to kind with Helm.
-        stage('Deploy') {
-            steps {
-                sh '''
-                    for svc in $SERVICES; do
-                        helm upgrade --install $svc devops/helm/petclinic -n dev -f devops/helm/petclinic/values/$svc.yaml
-                    done
-                '''
-            }
-        }
+        // NOTE: no Deploy stage here on purpose.
+        // GitOps: ArgoCD watches the git repo and deploys the Helm chart itself
+        // (see devops/gitops/). Jenkins only builds, scans and pushes images.
     }
 }
