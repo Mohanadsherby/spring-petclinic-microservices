@@ -11,7 +11,7 @@ pipeline {
         // Get the code from GitHub.
         stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'main', url: 'https://github.com/Mohanadsherby/spring-petclinic-microservices.git'
             }
         }
 
