@@ -1,6 +1,6 @@
 name: customers-service
 image: customers-service
-tag: 0.1.1
+tag: 0eee00d
 replicaCount: 1
 
 imageRegistry: nexus:8081/docker-hosted/dev
