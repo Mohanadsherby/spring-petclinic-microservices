@@ -3,7 +3,8 @@ pipeline {
 
     environment {
         SERVICES = 'config-server discovery-server customers-service vets-service visits-service api-gateway'
-        TAG = '0.1.1'
+        // TAG is not fixed anymore. We set it per build to the git commit SHA
+        // (see the "Set tag" stage), so every build makes a unique image.
     }
 
     stages {
@@ -12,6 +13,16 @@ pipeline {
         stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/Mohanadsherby/spring-petclinic-microservices.git'
+            }
+        }
+
+        // Use the short git commit SHA as the image tag (unique per commit).
+        stage('Set tag') {
+            steps {
+                script {
+                    env.TAG = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    echo "Image tag for this build: ${env.TAG}"
+                }
             }
         }
 
@@ -33,9 +44,6 @@ pipeline {
                             docker build --provenance=false -f devops/docker/$svc/Dockerfile -t localhost:8084/docker-hosted/dev/$svc:$TAG spring-petclinic-$svc
 
                             # Security scan (Phase 4). Runs Trivy as a throwaway container.
-                            #  - trivy-cache volume keeps the vuln DB between builds (no re-download)
-                            #  - --timeout 15m: our machine is slow, avoid the default 5m timeout
-                            #  - report only for now; || true so a slow scan never fails the build
                             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/trivy aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --timeout 15m --exit-code 0 localhost:8084/docker-hosted/dev/$svc:$TAG || true
 
                             docker push localhost:8084/docker-hosted/dev/$svc:$TAG
@@ -45,8 +53,29 @@ pipeline {
             }
         }
 
-        // NOTE: no Deploy stage here on purpose.
-        // GitOps: ArgoCD watches the git repo and deploys the Helm chart itself
-        // (see devops/gitops/). Jenkins only builds, scans and pushes images.
+        // GitOps write-back: put the new tag into the values files and push to git.
+        // ArgoCD sees the git change and deploys the new images.
+        stage('Update manifests (GitOps)') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
+                    sh '''
+                        # Write the new tag into every service values file.
+                        for svc in $SERVICES; do
+                            sed -i "s|^tag:.*|tag: $TAG|" devops/helm/petclinic/values/$svc.yaml
+                        done
+
+                        git config user.email "jenkins@petclinic.local"
+                        git config user.name "jenkins"
+                        git add devops/helm/petclinic/values/
+                        git commit -m "ci: deploy images tagged $TAG" || echo "nothing to commit"
+                        git push https://$GH_USER:$GH_TOKEN@github.com/Mohanadsherby/spring-petclinic-microservices.git HEAD:main
+                    '''
+                }
+            }
+        }
+
+        // NOTE: still no Deploy stage. ArgoCD (GitOps) deploys from git once the
+        // stage above pushes the new tag. Jenkins only builds, scans, pushes and
+        // updates the manifests.
     }
 }
