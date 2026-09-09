@@ -30,7 +30,7 @@ pipeline {
                         docker login localhost:8084 -u $USER -p $PASS
 
                         for svc in $SERVICES; do
-                            docker build -f devops/docker/$svc/Dockerfile -t localhost:8084/docker-hosted/dev/$svc:$TAG spring-petclinic-$svc
+                            docker build --provenance=false -f devops/docker/$svc/Dockerfile -t localhost:8084/docker-hosted/dev/$svc:$TAG spring-petclinic-$svc
                             docker push localhost:8084/docker-hosted/dev/$svc:$TAG
                         done
                     '''
