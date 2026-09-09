@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+
+    environment {
+        SERVICES = 'config-server discovery-server customers-service vets-service visits-service api-gateway'
+        TAG = '0.1.1'
+    }
+
+    stages {
+
+        // Get the code from GitHub.
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        // Build all the service jars.
+        stage('Build jars') {
+            steps {
+                sh './mvnw clean package -DskipTests'
+            }
+        }
+
+        // Build an image per service and push it to Nexus.
+        stage('Build & push images') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh '''
+                        docker login localhost:8084 -u $USER -p $PASS
+
+                        for svc in $SERVICES; do
+                            docker build -f devops/docker/$svc/Dockerfile -t localhost:8084/docker-hosted/dev/$svc:$TAG spring-petclinic-$svc
+                            docker push localhost:8084/docker-hosted/dev/$svc:$TAG
+                        done
+                    '''
+                }
+            }
+        }
+
+        // Deploy each service to kind with Helm.
+        stage('Deploy') {
+            steps {
+                sh '''
+                    for svc in $SERVICES; do
+                        helm upgrade --install $svc devops/helm/petclinic -n dev -f devops/helm/petclinic/values/$svc.yaml
+                    done
+                '''
+            }
+        }
+    }
+}

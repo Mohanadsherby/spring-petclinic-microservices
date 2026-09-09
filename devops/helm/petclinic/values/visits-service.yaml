@@ -1,0 +1,40 @@
+name: visits-service
+image: visits-service
+tag: 0.1.1
+replicaCount: 1
+
+imageRegistry: nexus:8081/docker-hosted/dev
+imagePullSecret: nexus-registry-secret
+imagePullPolicy: Always
+
+port: 8082
+healthPath: /actuator/health
+
+config:
+  configServerUrl: http://config-server:8888/
+  springProfilesActive: docker
+
+service:
+  type: ClusterIP
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  startup:
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30
+  readiness:
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
