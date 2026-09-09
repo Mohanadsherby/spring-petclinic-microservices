@@ -1,0 +1,36 @@
+# Prometheus scrape config. The app services live in the "dev" namespace,
+# so we reach them by their in-cluster DNS name: <service>.dev.svc.cluster.local
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: api-gateway
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['api-gateway.dev.svc.cluster.local:8080']
+
+      - job_name: customers-service
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['customers-service.dev.svc.cluster.local:8081']
+
+      - job_name: visits-service
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['visits-service.dev.svc.cluster.local:8082']
+
+      - job_name: vets-service
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['vets-service.dev.svc.cluster.local:8083']
