@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+
+    environment {
+        SERVICE = 'vets-service'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/Mohanadsherby/spring-petclinic-microservices.git'
+            }
+        }
+
+        // Unique image tag = short git commit SHA.
+        stage('Set tag') {
+            steps {
+                script {
+                    env.TAG = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    echo "Image tag: ${env.TAG}"
+                }
+            }
+        }
+
+        // Build only this service (-pl) plus what it needs (-am).
+        stage('Build jar') {
+            steps {
+                sh './mvnw -pl spring-petclinic-$SERVICE -am package -DskipTests'
+            }
+        }
+
+        stage('Build & push image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh '''
+                        docker login localhost:8084 -u $USER -p $PASS
+                        docker build --provenance=false -f devops/docker/$SERVICE/Dockerfile -t localhost:8084/docker-hosted/dev/$SERVICE:$TAG spring-petclinic-$SERVICE
+                        docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/trivy aquasec/trivy:latest image --scanners vuln --severity HIGH,CRITICAL --timeout 15m --exit-code 0 localhost:8084/docker-hosted/dev/$SERVICE:$TAG || true
+                        docker push localhost:8084/docker-hosted/dev/$SERVICE:$TAG
+                    '''
+                }
+            }
+        }
+
+        // Write the new tag into this service's values file and push to git.
+        // ArgoCD then deploys it.
+        stage('Update manifest (GitOps)') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GH_USER', passwordVariable: 'GH_TOKEN')]) {
+                    sh '''
+                        sed -i "s|^tag:.*|tag: $TAG|" devops/helm/petclinic/values/$SERVICE.yaml
+                        git config user.email "jenkins@petclinic.local"
+                        git config user.name "jenkins"
+                        git add devops/helm/petclinic/values/$SERVICE.yaml
+                        git commit -m "ci: deploy $SERVICE tagged $TAG" || echo "nothing to commit"
+                        git push https://$GH_USER:$GH_TOKEN@github.com/Mohanadsherby/spring-petclinic-microservices.git HEAD:main
+                    '''
+                }
+            }
+        }
+    }
+}
